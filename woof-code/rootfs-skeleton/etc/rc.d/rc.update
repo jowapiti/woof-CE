@@ -22,6 +22,8 @@ fi
 
 #=============================================================
 
+. /etc/rc.d/PUPSTATE
+
 PUPMODE="$1"
 
 [ "$PUPMODE" = "" ] && exit
@@ -29,6 +31,8 @@ PUPMODE="$1"
 echo -n "Updating..." >/dev/console #updating
 
 KERNVER="`uname -r`"
+
+[ "$PUNIONFS" = "overlay" ] && [ -f /etc/rc.d/functions_overlay_up ] && . /etc/rc.d/functions_overlay_up
 
 depmod_func() { #then run depmod to overwrite any depmod files on OLD layer...
   echo "Executing depmod, to update module files..."
@@ -99,8 +103,8 @@ case $PUPMODE in
  ;;
  "12") #no tmpfs, ${DISTRO_FILE_PREFIX}save.3fs (pup_rw), nothing (pup_ro1), ${DISTRO_PUPPYSFS} (pup_ro2)
   #example: boot from live-cd, ${DISTRO_FILE_PREFIX}save.3fs on a fast h.d. partition.
-  NEWFILESMNTPT="/initrd/pup_ro2"
-  OLDFILESMNTPT="/initrd/pup_rw"
+  NEWFILESMNTPT="/initrd${PUP_LAYER}"
+  OLDFILESMNTPT="/initrd${SAVE_LAYER}"
  ;;
  "13") #tmpfs (pup_rw), ${DISTRO_FILE_PREFIX}save.3fs (pup_ro1), ${DISTRO_PUPPYSFS} (pup_ro2).
   #example: boot from usb flash, ${DISTRO_FILE_PREFIX}save.3fs on flash media (needs restrained writes).
@@ -111,6 +115,14 @@ case $PUPMODE in
   #example: boot from multisession live-cd/dvd, pup_ro1 is a tmpfs folders copied from cd.
   NEWFILESMNTPT="/initrd/pup_ro2"
   OLDFILESMNTPT="/initrd/pup_ro1"
+ ;;
+ "21") #overlayfs - tar tmpfs (pup_rw)
+  NEWFILESMNTPT="/initrd${PUP_LAYER}"
+  OLDFILESMNTPT="/initrd${RW_LAYER}"
+ ;;
+ "93") #overlayfs - multisession dvd - tar tmpfs (pup_rw)
+  NEWFILESMNTPT="/initrd${PUP_LAYER}"
+  OLDFILESMNTPT="/initrd${RW_LAYER}"
  ;;
  5)
   #PUPMODE=5 is first boot, ignore.
@@ -281,13 +293,17 @@ xLANG="`grep '^LANG=' /etc/profile | cut -f 2 -d '=' | cut -f 1 -d ' '`"
 
 #stuff to update on every boot...
 
-#think have to do this everytime...
-cp -af ${NEWFILESMNTPT}/etc/DISTRO_SPECS /etc/
-touch /etc/DISTRO_SPECS #important, as snapmergepuppy uses '-u' cp option. ...huh, why?
+if [ "$PUNIONFS" != "overlay" ];then
+ #think have to do this everytime...
+ cp -af ${NEWFILESMNTPT}/etc/DISTRO_SPECS /etc/
+ touch /etc/DISTRO_SPECS #important, as snapmergepuppy uses '-u' cp option. ...huh, why?
+fi
 
 #v2.16 if aufs layers have changed, may need to fix menu (etc)...
 #note, BootManager may be popped-up, see /usr/sbin/delayedrun.
-if [ -d /initrd ];then #test it isn't full hd installation.
+if [ "$PUNIONFS" = "overlay" ];then
+ [ -f /etc/rc.d/functions_overlay_up ] && sfs_selective_update
+elif [ -d /initrd ];then #test it isn't full hd installation.
  . /etc/rc.d/BOOTCONFIG
  
  #v2.16.1 bug with multisession-cd, different folder at each startup, so screen out...

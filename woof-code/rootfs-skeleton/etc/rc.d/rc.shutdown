@@ -61,6 +61,8 @@ export CDRECORD MKISOFS
 . /etc/rc.d/functions4puppy
 #--
 
+[ "$PUNIONFS" = "overlay" ] && [ -f /etc/rc.d/functions_overlay_shut ] && . /etc/rc.d/functions_overlay_shut
+
 killzombies() { #zombie process prevents partition unmount.
  #karl godt: see http://www.murga-linux.com/puppy/viewtopic.php?t=73122
  ZOMBIES="`ps -H -A | grep '<defunct>' | sed 's/^[[:blank:]]*//g' | cut -f 1 -d ' ' | sort -gr | tr '\n' ' '`"
@@ -179,8 +181,10 @@ done
 
 killall udevd > /dev/null 2>&1
 
+if [ "$PUNIONFS" = "overlay" ];then
+ [ -f /etc/rc.d/functions_overlay_shut ] && overlay_shutdownconfig
+elif [ $PUPMODE -eq 5 ];then
 #first time booted puppy, there may not have been any persistent storage...
-if [ $PUPMODE -eq 5 ];then
  # shutdownconfig creates /tmp/shutdownconfig_results
  # which contains variables to be used further in the script
  unset PUPSAVE SAVEFS SAVEPART SAVEFILE NAMEONLY SAVEPATH MYPASSWORD SFEXT xPDEV xDEVFS
@@ -377,6 +381,18 @@ case $PUPMODE in
     /usr/sbin/snapmergepuppy /initrd/pup_ro1 /initrd/pup_rw
   fi 
   ;;
+ 21) #overlay, every shutdown, simple tar save
+  [ -f /etc/rc.d/functions_overlay_shut ] && overlay_save_archive
+  ;;
+ 93) #overlay, every shutdown, multisession dvd tar save
+  [ -f /etc/rc.d/functions_overlay_shut ] && overlay_save_dvd
+  ;;
+ 140) #overlay, 1st shutdown, P_MODE=12
+  [ -f /etc/rc.d/functions_overlay_shut ] && overlay_save_dir
+  ;;
+ 149) #overlay, on request, split into tar and sfs
+  [ -f /etc/rc.d/functions_overlay_shut ] && overlay_squash_archive
+  ;;
  *)
   echo "$(gettext "Session not saved")" >/dev/console
   sleep 2
@@ -437,8 +453,10 @@ PIVOT_INITRD=
 [ "$(mount | grep ' /initrd/files ')" ] && PIVOT_INITRD=1
 case $(file $BB) in *ELF*statically*) PIVOT_INITRD=1 ;; esac
 
-# remount PUNIONFS read-only
-if [ "$SAVE_LAYER" ];then
+if [ "$PUNIONFS" = "overlay" ];then
+	[ -f /etc/rc.d/functions_overlay_shut ] && overlay_ro
+elif [ "$SAVE_LAYER" ];then
+	# remount PUNIONFS read-only
 	SAVEDEV=`grep "/initrd${SAVE_LAYER}" /proc/mounts | cut -f 1 -d ' '`
 	SAVEFS=`grep "/initrd${SAVE_LAYER}" /proc/mounts | cut -f 3 -d ' '`
 	#Patriot suggested this code to enable save-layer to remount ro...
