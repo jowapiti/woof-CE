@@ -914,6 +914,9 @@ echo -e "\\033[0;34m ***\\033[0;39m"
 [ $ydrv ] && YDRV=$ydrv
 #<partition>:<filename>, for savefile/savefolder. <partition> can be a name or Label or UUID
 [ $psave ] && PSAVE=$psave #ex: sdb4:/puppy/tahr/tahrsave or smark or 49baa82d-8c69:tahrsave
+[ $pbootpart ] && PBOOTPART=$pbootpart #<partition> can be a name or Label or UUID
+[ $pbootdir ] && PBOOTDIR=$pbootdir #directory containing vmlinuz file
+[ $PBOOTDIR ] && [ "${PBOOTDIR:0:1}" != "/" ] && PBOOTDIR="/${PBOOTDIR}" #add leading /.
 #list of kernel modules to load, ex: pimod=hid-logitech-dj.ko,kernel/drivers/hid/hid-multitouch.ko 
 [ $pimod ] && PIMOD=$pimod
 #specify partition for Underdog Linux (refer also underdog.lnx).
@@ -1367,6 +1370,13 @@ echo -n $(($TOTAL_SIZEK_SFS_RAM - 5)) > /tmp/sfs_ram_sizek
 [ "$DEV1FS" ] || DEV1FS="$(echo "$PDRV" | cut -f 2 -d ',')"
 [ "$ATADRIVES" ] || ATADRIVES="$(cat /tmp/ATADRIVES0 | tr '\n' ' ')"
 
+if [ "$PBOOTPART" ];then
+ decode_id "$PBOOTPART"
+ [ "$ONE_PART" ] ||  { wait_for_usb;  decode_id "$PBOOTPART"; }
+ PBOOTPART="$ONE_PART"
+fi
+[ "$PBOOTPART" ] || PBOOTDIR=''
+
 mkdir -p /pup_new/etc/rc.d
 ( # > /pup_new/etc/rc.d/PUPSTATE
 echo "PUPMODE=$PUPMODE"
@@ -1398,6 +1408,8 @@ echo "PSAVEDIR='$SAVE_BP_DIR'"
 echo "PSUBDIR='$PSUBDIR'"
 echo "PUNIONFS='aufs'"
 echo "DOIMODS='yes'"
+echo "PBOOTPART='$PBOOTPART'"
+echo "PBOOTDIR='$PBOOTDIR'"
 [ -f /sbin/set_plang ] && plang_pupstate #echo
 [ "$UNDERDOG" ] && echo "UNDERDOG='$UNDERDOG'"
 ) > /pup_new/etc/rc.d/PUPSTATE
